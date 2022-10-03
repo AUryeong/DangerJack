@@ -55,12 +55,14 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     public override void OnPlayerEnteredRoom(Photon.Realtime.Player newPlayer)
     {
         panel.gameObject.SetActive(false);
+        GameManager.Instance.GameStart();
     }
     public override void OnJoinedRoom()
     {
         if(PhotonNetwork.CurrentRoom.PlayerCount >= 2)
         {
             panel.gameObject.SetActive(false);
+            GameManager.Instance.GameStart();
         }
     }
     void JoinButton()
@@ -82,6 +84,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         nicknameInput.gameObject.SetActive(false);
         loadingText.gameObject.SetActive(true);
         findingEnemyText.gameObject.SetActive(false);
+        GameManager.Instance.GameEnd();
         PhotonNetwork.ConnectUsingSettings();
     }
     #endregion
