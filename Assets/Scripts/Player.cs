@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using Photon.Pun;
 using Photon.Realtime;
+using UnityEngine.PlayerLoop;
 
 public class Player : MonoBehaviourPun
 {
@@ -23,15 +24,18 @@ public class Player : MonoBehaviourPun
     }
 
     [PunRPC]
-    public void SetRandomTeam()
+    public void SetTeam(int teamIdx)
     {
-        team = RandomUtil.Select(GameManager.Instance.teams);
-        GameManager.Instance.teams.Remove(team);
-        if (!photonView.IsMine)
-            GameManager.Instance.enemyPlayer = this;
-        if(GameManager.Instance.teams.Count <= 0)
+        team = (Team)teamIdx;
+        if (photonView.IsMine)
         {
-            GameManager.Instance.ShowTeamColor();
+            GameManager.Instance.player = this;
+            GameManager.Instance.UpdatePlayerColor();
+        }
+        else
+        {
+            GameManager.Instance.enemyPlayer = this;
+            GameManager.Instance.UpdateEnemyName();
         }
     }
 

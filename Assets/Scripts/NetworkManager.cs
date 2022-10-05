@@ -9,6 +9,7 @@ using TMPro;
 
 public class NetworkManager : MonoBehaviourPunCallbacks
 {
+    public static Photon.Realtime.Player otherOwner;
     [SerializeField]
     TMP_InputField nicknameInput;
     [SerializeField]
@@ -32,9 +33,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         findingEnemyText.gameObject.SetActive(false);
         loadingText.gameObject.SetActive(false);
         quitButton.onClick.RemoveAllListeners();
-        quitButton.onClick.AddListener(new UnityAction(QuitButton));
+        quitButton.onClick.AddListener(() => QuitButton());
         joinButton.onClick.RemoveAllListeners();
-        joinButton.onClick.AddListener(new UnityAction(JoinButton));
+        joinButton.onClick.AddListener(() => JoinButton());
     }
     #region 立加包府
     public override void OnConnectedToMaster()
@@ -54,15 +55,22 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     }
     public override void OnPlayerEnteredRoom(Photon.Realtime.Player newPlayer)
     {
+        otherOwner = newPlayer;
         panel.gameObject.SetActive(false);
         GameManager.Instance.GameStart();
     }
     public override void OnJoinedRoom()
     {
-        if(PhotonNetwork.CurrentRoom.PlayerCount >= 2)
+        if (PhotonNetwork.CurrentRoom.PlayerCount >= 2)
         {
+            foreach (var player in PhotonNetwork.CurrentRoom.Players.Values)
+            {
+                if (player != PhotonNetwork.LocalPlayer)
+                {
+                    otherOwner = player;
+                }
+            }
             panel.gameObject.SetActive(false);
-            GameManager.Instance.GameStart();
         }
     }
     void JoinButton()
@@ -84,7 +92,6 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         nicknameInput.gameObject.SetActive(false);
         loadingText.gameObject.SetActive(true);
         findingEnemyText.gameObject.SetActive(false);
-        GameManager.Instance.GameEnd();
         PhotonNetwork.ConnectUsingSettings();
     }
     #endregion
