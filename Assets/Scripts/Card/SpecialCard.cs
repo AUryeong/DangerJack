@@ -5,13 +5,12 @@ using Photon.Pun;
 using Photon.Realtime;
 using TMPro;
 
-public class SpecialCard : MonoBehaviour
+public class SpecialCard
 {
-    [SerializeField]
-    protected TextMeshPro nameText;
-    [SerializeField]
-    protected TextMeshPro loreText;
-    private Player owner;
+    protected Player owner
+    {
+        get; private set;
+    }
     public virtual void Init(Player player)
     {
         owner = player;

@@ -4,14 +4,26 @@ using UnityEngine;
 
 public class SpecialCard_GameTable : SpecialCard
 {
-    [SerializeField]
     protected int timer;
+    protected virtual int maxTimer
+    {
+        get
+        {
+            return 0;
+        }
+    }
+
+    public override void Init(Player player)
+    {
+        base.Init(player);
+        timer = maxTimer;
+    }
 
     public virtual bool IsUsableSpecial()
     {
         return true;
     }
-    
+
     public virtual bool IsNumberChangable()
     {
         return true;
@@ -24,13 +36,12 @@ public class SpecialCard_GameTable : SpecialCard
 
     public virtual void OnBreak()
     {
-        Destroy(gameObject);
     }
 
     public virtual void OnNextTurn()
     {
         timer--;
-        if(timer <= 0)
+        if (timer <= 0)
         {
             OnBreak();
         }

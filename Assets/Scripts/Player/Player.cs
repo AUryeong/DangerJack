@@ -10,6 +10,14 @@ public class Player : MonoBehaviourPun
     public Team team;
     public List<NumberCard> numberCards = new List<NumberCard>();
     public List<SpecialCard> specialCards = new List<SpecialCard>();
+
+    public string setTeamName
+    {
+        get
+        {
+            return nameof(SetTeam);
+        }
+    }
     public int GetSum()
     {
         int sum = 0;

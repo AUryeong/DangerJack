@@ -11,12 +11,10 @@ public enum Team
     Red,
     Blue
 }
-public class GameManager : MonoBehaviourPun
+public class GameManager : SingletonPun<GameManager>
 {
     public int turnCount;
-    public Team turnOwner;
-    public List<NumberCard> decks;
-    public List<SpecialCard> specialDecks;
+    public Team turnOwner = Team.Red;
     public Player player;
     public Player enemyPlayer;
     [SerializeField]
@@ -24,25 +22,10 @@ public class GameManager : MonoBehaviourPun
     [SerializeField]
     Text text;
 
-    static GameManager _instance;
-    public static GameManager Instance       
-    {
-        get
-        {
-            if (_instance == null)
-                FindObjectOfType<GameManager>();
-            return _instance;
-        }
-    }
-    void Awake()
-    {
-        _instance = this;
-    }
-
     public void GameStart()
     {
         int teamIdx = Random.Range(1, 3);
-        photonView.RPC(nameof(PlayerCreate), RpcTarget.OthersBuffered, new object[] { (teamIdx == 1) ? 2: 1 });
+        photonView.RPC(nameof(PlayerCreate), RpcTarget.OthersBuffered, TeamUtil.OtherInt(teamIdx));
         PlayerCreate(teamIdx);
 
         image.color = TeamUtil.TeamToColor((Team)teamIdx);
@@ -51,13 +34,14 @@ public class GameManager : MonoBehaviourPun
     [PunRPC]
     void FinishLog()
     {
-        Debug.Log("¿¿æ÷");
+
     }
 
     public void UpdatePlayerColor()
     {
         image.gameObject.SetActive(true);
         image.color = TeamUtil.TeamToColor(player.team);
+        player.gameObject.SetActive(false);
     }
 
     public void UpdateEnemyName()
@@ -70,7 +54,7 @@ public class GameManager : MonoBehaviourPun
     void PlayerCreate(int teamIdx)
     {
         player = PhotonNetwork.Instantiate(nameof(Player), Vector3.zero, Quaternion.identity).GetComponent<Player>();
-        player.photonView.RPC("SetTeam", RpcTarget.AllBuffered, new object[] { teamIdx });
+        player.photonView.RPC(player.setTeamName, RpcTarget.AllBuffered, teamIdx);
         photonView.RPC(nameof(FinishLog), RpcTarget.Others);
     }
 
@@ -109,6 +93,19 @@ public static class TeamUtil
                 return Team.Red;
             default:
                 return Team.None;
+        }
+    }
+
+    public static int OtherInt(int idx)
+    {
+        switch (idx)
+        {
+            case 1:
+                return 2;
+            case 2:
+                return 1;
+            default:
+                return 0;
         }
     }
 }
