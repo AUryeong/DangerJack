@@ -53,6 +53,17 @@ MonoBehaviour:
   - FinishLog
   - SetTeam
   - PunSetActive
+  - AddNumberCard
+  - SetNumberCardRPC
+  - SetPlayerNameRPC
+  - TurnChangeRPC
+  - TurnSettingRPC
+  - InitRPC
+  - NumberDrawRPC
+  - AddNumberCardRPC
+  - SetTeamRPC
+  - SetNotActRPC
+  - DrawNumberRPC
   DisableAutoOpenWizard: 1
   ShowSettings: 0
   DevRegionSetOnce: 1

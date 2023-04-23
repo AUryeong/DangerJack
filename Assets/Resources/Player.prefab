@@ -119,5 +119,4 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   team: 0
-  numberCards: []
-  specialCards: []
+  numberCards: 
