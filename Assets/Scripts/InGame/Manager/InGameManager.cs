@@ -83,6 +83,7 @@ public class InGameManager : SingletonPunCallBack<InGameManager>
         if (!IsGaming) return;
 
         DeckManager.Instance.Init();
+        UIManager.Instance.LogText("게임 시작", LogType.EVERYONE);
 
         player.DrawNumberCard();
         player.DrawNumberCard();
@@ -90,7 +91,11 @@ public class InGameManager : SingletonPunCallBack<InGameManager>
         enemyPlayer.DrawNumberCard();
         enemyPlayer.DrawNumberCard();
 
+        GetPlayer(Team.RED).DrawSpecialCard(2);
         photonView.RPC(nameof(InitRPC), RpcTarget.AllBuffered);
+        
+        string coloringName = TeamUtil.GetColoringPlayerName(GetPlayer(TeamUtil.OtherTeam(Team.RED)));
+        UIManager.Instance.LogText($"{coloringName}의 턴", LogType.EVERYONE);
 
         UIManager.Instance.TurnSetting();
     }
@@ -100,6 +105,7 @@ public class InGameManager : SingletonPunCallBack<InGameManager>
     {
         IsGaming = true;
         isTurnNoDraw = true;
+
         turnCount = 1;
         turnOwner = Team.RED;
     }
@@ -117,12 +123,13 @@ public class InGameManager : SingletonPunCallBack<InGameManager>
     private void TurnChangeRPC(bool isTurnSkipPrev)
     {
         Team team = turnOwner;
-        if (isEnemyTurnNoDraw && isTurnNoDraw)
+        if (isEnemyTurnNoDraw && isTurnSkipPrev)
         {
             Player winner = null;
-            int blackJack = 21;
+            int targetNumber = 21;
+            UIManager.Instance.LogText("게임 종료!");
 
-            if (player.GetSum() > blackJack && enemyPlayer.GetSum() > blackJack)
+            if (player.GetSum() > targetNumber && enemyPlayer.GetSum() > targetNumber)
             {
                 if (player.GetSum() == enemyPlayer.GetSum())
                     winner = player.team == Team.BLUE ? player : enemyPlayer;
@@ -133,12 +140,12 @@ public class InGameManager : SingletonPunCallBack<InGameManager>
             }
             else
             {
-                if (player.GetSum() > blackJack)
+                if (player.GetSum() > targetNumber)
                 {
-                    if (enemyPlayer.GetSum() <= blackJack)
+                    if (enemyPlayer.GetSum() <= targetNumber)
                         winner = enemyPlayer;
                 }
-                else if (enemyPlayer.GetSum() > blackJack)
+                else if (enemyPlayer.GetSum() > targetNumber)
                 {
                     winner = player;
                 }
@@ -155,6 +162,7 @@ public class InGameManager : SingletonPunCallBack<InGameManager>
 
             UIManager.Instance.UpdateCard(player.team, player.numberCards, true);
             UIManager.Instance.UpdateCard(enemyPlayer.team, enemyPlayer.numberCards, true);
+            UIManager.Instance.LogText(TeamUtil.GetColoringPlayerName(player) + "의 승리!");
             UIManager.Instance.GameEnd(winner);
             IsGaming = false;
             return;
@@ -162,12 +170,21 @@ public class InGameManager : SingletonPunCallBack<InGameManager>
 
         UIManager.Instance.PlayerNotActSetting(team, isTurnNoDraw);
         UIManager.Instance.PlayerNotActSetting(TeamUtil.OtherTeam(team), false);
+        string coloringName = TeamUtil.GetColoringPlayerName(GetPlayer(TeamUtil.OtherTeam(team)));
+        UIManager.Instance.LogText($"{coloringName}의 턴");
 
+        if (isTurnSkipPrev)
+        {
+            UIManager.Instance.LogText($"{coloringName}가 숫자 카드를 뽑지 않았습니다.");
+        }
         isEnemyTurnNoDraw = isTurnSkipPrev;
         isTurnNoDraw = true;
 
+        turnOwner = TeamUtil.OtherTeam(team);
         turnCount++;
-        turnOwner = TeamUtil.OtherTeam(turnOwner);
+
+        if (master)
+            GetPlayer(turnOwner).DrawSpecialCard(2);
 
         UIManager.Instance.TurnSetting();
     }
@@ -175,9 +192,15 @@ public class InGameManager : SingletonPunCallBack<InGameManager>
     public void DrawNumber()
     {
         if (!IsTurnMine) return;
-        if (!isTurnNoDraw) return;
-        if (DeckManager.Instance.IsNumberEmpty())
+        if (!isTurnNoDraw)
         {
+            UIManager.Instance.LogText("이번 턴 이미 숫자 카드를 뽑았습니다.");
+            return;
+        }
+
+        if (DeckManager.Instance.IsNumberDeckEmpty())
+        {
+            UIManager.Instance.LogText("숫자 카드 덱이 비어있습니다.");
             return;
         }
 
@@ -190,6 +213,15 @@ public class InGameManager : SingletonPunCallBack<InGameManager>
     private void DrawNumberRPC()
     {
         isTurnNoDraw = false;
+    }
+
+    public Player GetPlayer(Team team)
+    {
+        return player.team == team ? player : enemyPlayer;
+    }
+
+    public void UseSpecialCard(SpecialType specialType)
+    {
     }
 }
 
@@ -216,6 +248,19 @@ public static class TeamUtil
         }
     }
 
+    public static string TeamToColorText(Team team)
+    {
+        switch (team)
+        {
+            case Team.RED:
+                return "<#ff0000>";
+            case Team.BLUE:
+                return "<#0000ff>";
+            default:
+                return "";
+        }
+    }
+
     public static Team OtherTeam(Team team)
     {
         switch (team)
@@ -227,5 +272,10 @@ public static class TeamUtil
             default:
                 return Team.NONE;
         }
+    }
+
+    public static string GetColoringPlayerName(Player player)
+    {
+        return TeamToColorText(player.team) + player.NickName + "</color>";
     }
 }

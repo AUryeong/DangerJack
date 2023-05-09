@@ -10,6 +10,13 @@ public class GameManager : Singleton<GameManager>
 {
     protected override bool IsDontDestroying => true;
 
+    protected override void OnCreated()
+    {
+        OnReset();
+        Application.targetFrameRate = 60;
+        Application.runInBackground = true;
+    }
+
     protected override void OnReset()
     {
         SetResolution();
@@ -20,7 +27,7 @@ public class GameManager : Singleton<GameManager>
         SceneManager.LoadScene((int)sceneType);
     }
 
-    void SetResolution()
+    private void SetResolution()
     {
         int setWidth = 2000;
         int setHeight = 900;
