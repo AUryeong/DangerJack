@@ -49,7 +49,10 @@ public class DeckManager : SingletonPun<DeckManager>
             numberDecks.Add(i);
         
         for (SpecialType specialCard = 0; specialCard <= SpecialType.TIMEWATCH; specialCard++)
+        {
+            if (specialCard == SpecialType.ALCHEMY || specialCard == SpecialType.SPECIAL_EYE || specialCard >= SpecialType.SEAL) continue;
             specialDecks.Add(specialCard);
+        }
     }
 
     #region NumberCard
@@ -79,12 +82,6 @@ public class DeckManager : SingletonPun<DeckManager>
     private void DrawNumberRPC(int number)
     {
         numberDecks.Remove(number);
-    }
-
-    public void DrawSpecialNumber(int number)
-    {
-        if (IsContainNumber(number))
-            photonView.RPC(nameof(DrawNumberRPC), RpcTarget.AllBuffered, number);
     }
     
     public void ReturnNumberDeck(int number)
@@ -116,6 +113,12 @@ public class DeckManager : SingletonPun<DeckManager>
         SpecialType card = RandomUtil.Select(specialDecks);
         photonView.RPC(nameof(DrawSpecialRPC), RpcTarget.AllBuffered, card);
         return card;
+    }
+
+    public void DrawSpecialNumber(int number)
+    {
+        if (IsContainNumber(number))
+            photonView.RPC(nameof(DrawNumberRPC), RpcTarget.AllBuffered, number);
     }
 
     [PunRPC]

@@ -22,6 +22,8 @@ public class UIManager : SingletonPun<UIManager>
 
     [SerializeField] private RectTransform turnActParent;
 
+    [SerializeField] private TextMeshProUGUI targetValueText;
+
     [Header("Result")] [SerializeField] private RectTransform gameEndParent;
 
     [SerializeField] private TextMeshProUGUI winText;
@@ -116,11 +118,12 @@ public class UIManager : SingletonPun<UIManager>
 
     private void ExitSpecialCard()
     {
-        
+        specialCardWindow.gameObject.SetActive(false);
     }
 
     private void UseSpecialCard()
     {
+        ExitSpecialCard();
         InGameManager.Instance.UseSpecialCard(specialType);
     }
 
@@ -143,6 +146,11 @@ public class UIManager : SingletonPun<UIManager>
             bluePlayerStatus.SetPlayerName(player.NickName);
     }
 
+    public void TargetValueSetting()
+    {
+        targetValueText.text = $"<size=60%>목표 숫자</size>\n{InGameManager.Instance.targetValue}";
+    }
+
     public void TurnSetting()
     {
         photonView.RPC(nameof(TurnSettingRPC), RpcTarget.AllBuffered);
@@ -151,8 +159,8 @@ public class UIManager : SingletonPun<UIManager>
     [PunRPC]
     private void TurnSettingRPC()
     {
-        turnCountText.text = InGameManager.Instance.turnCount.ToString();
-        turnOwnerText.text = InGameManager.Instance.GetPlayer(InGameManager.Instance.turnOwner).NickName + "의 턴";
+        turnCountText.text = InGameManager.Instance.turnCount.ToString() + "번째 턴";
+        turnOwnerText.text = TeamUtil.GetColoringPlayerName(InGameManager.Instance.GetPlayer(InGameManager.Instance.turnOwner)) + "의 턴";
         turnActParent.gameObject.SetActive(InGameManager.Instance.player.team == InGameManager.Instance.turnOwner);
     }
 
