@@ -70,7 +70,7 @@ public class InGameManager : SingletonPunCallBack<InGameManager>
     {
         return new List<CardTable>(cardTables);
     }
-    
+
     private void OnApplicationQuit()
     {
         DisconnectGameRPC();
@@ -369,12 +369,11 @@ public class InGameManager : SingletonPunCallBack<InGameManager>
         {
             alchemyCount--;
             player.ReturnSpecialCard(specialType);
-            UIManager.Instance.OpenSpecialCardWindow();
             UIManager.Instance.LogText($"<color=#FFEE00>{ResourceManager.Instance.GetSpecialData(specialType).name}</color>를 덱으로 돌려보냈습니다.");
             if (alchemyCount <= 0)
-            {
                 player.DrawSpecialCard(3);
-            }
+            else
+                UIManager.Instance.OpenSpecialCardWindow(true);
             return;
         }
 
@@ -407,7 +406,7 @@ public class InGameManager : SingletonPunCallBack<InGameManager>
 
         if (specialType == SpecialType.ALCHEMY)
         {
-            if (owner.specialCards.Count <= 3)
+            if (owner.specialCards.Count <= 2)
             {
                 UIManager.Instance.LogText($"<color=#FFEE00>{ResourceManager.Instance.GetSpecialData(specialType).name}</color>을 사용할려면 2장의 스페셜 카드가 필요합니다!");
                 return;
@@ -619,7 +618,7 @@ public class InGameManager : SingletonPunCallBack<InGameManager>
                 break;
             case SpecialType.ALCHEMY:
                 alchemyCount = 2;
-                UIManager.Instance.OpenSpecialCardWindow();
+                UIManager.Instance.OpenSpecialCardWindow(true);
                 break;
             case SpecialType.PERFECT_SELECT:
                 if (DeckManager.Instance.IsNumberDeckEmpty())

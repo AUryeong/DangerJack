@@ -101,7 +101,7 @@ public class UIManager : SingletonPun<UIManager>
         }
     }
 
-    public void OpenSpecialCardWindow()
+    public void OpenSpecialCardWindow(bool isAlchemy = false)
     {
         var player = InGameManager.Instance.player;
 
@@ -110,6 +110,7 @@ public class UIManager : SingletonPun<UIManager>
         specialCardName.gameObject.SetActive(false);
         specialCardDescription.gameObject.SetActive(false);
         specialCardUseButton.gameObject.SetActive(false);
+        specialCardExitButton.gameObject.SetActive(!isAlchemy);
 
         for (int i = 0; i < specialCards.Count; i++)
         {
@@ -129,7 +130,7 @@ public class UIManager : SingletonPun<UIManager>
     {
         selectCardWindow.gameObject.SetActive(true);
 
-        specialCardName.text = ResourceManager.Instance.GetSpecialData(type).name;
+        selectCardName.text = ResourceManager.Instance.GetSpecialData(type).name;
         for (int i = 0; i < selectCardButtons.Length; i++)
         {
             if (selectNames.Length > i)

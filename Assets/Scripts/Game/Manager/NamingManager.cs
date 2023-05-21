@@ -30,6 +30,7 @@ public class NamingManager : MonoBehaviour
     private void JoinButton()
     {
         if (isJoining) return;
+        if (string.IsNullOrEmpty(nicknameInput.text) || string.IsNullOrWhiteSpace(nicknameInput.text)) return;
 
         isJoining = true;
         GameManager.Instance.nickName = nicknameInput.text;

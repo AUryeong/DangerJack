@@ -23,12 +23,10 @@ public class GameManager : Singleton<GameManager>
     
     private void LoadNickName()
     {
-        nickName = PlayerPrefs.GetString("NickName", string.Empty);
     }
 
     private void SaveNickName()
     {
-        PlayerPrefs.SetString("NickName", nickName);
     }
 
     private void OnApplicationPause(bool pauseStatus)

@@ -19,7 +19,7 @@ public class MatchingManager : MonoBehaviourPunCallbacks
 
     private void Start()
     {
-        PhotonNetwork.ConnectUsingSettings(); // ¿¬°á
+        PhotonNetwork.ConnectUsingSettings(); // ì—°ê²°
     }
 
     private void QuitButton()
@@ -36,13 +36,13 @@ public class MatchingManager : MonoBehaviourPunCallbacks
 
     public override void OnJoinRandomFailed(short returnCode, string message)
     {
-        // Á¢¼Ó ½ÇÆĞ½Ã ¹æ»ı¼º
+        // ì ‘ì† ì‹¤íŒ¨ì‹œ ë°©ìƒì„±
         PhotonNetwork.CreateRoom("", new RoomOptions { MaxPlayers = 2 });
     }
 
     public override void OnCreatedRoom()
     {
-        loadingText.Text = "»ó´ë¹æÀ» Ã£´Â Áß";
+        loadingText.Text = "ìƒëŒ€ë°©ì„ ì°¾ëŠ” ì¤‘";
     }
 
     public override void OnPlayerEnteredRoom(Photon.Realtime.Player newPlayer)
@@ -63,7 +63,7 @@ public class MatchingManager : MonoBehaviourPunCallbacks
         PhotonNetwork.Disconnect();
         
         loadingText.gameObject.SetActive(true);
-        loadingText.Text = "·Îµù Áß";
+        loadingText.Text = "ë¡œë”© ì¤‘";
         
         PhotonNetwork.ConnectUsingSettings();
     }
