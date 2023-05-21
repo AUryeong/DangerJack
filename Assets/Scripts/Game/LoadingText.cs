@@ -1,9 +1,5 @@
-using System;
-using System.Collections;
-using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
-using UnityEngine.Serialization;
 
 public class LoadingText : MonoBehaviour
 {
@@ -18,7 +14,6 @@ public class LoadingText : MonoBehaviour
             textMeshPro.text = text;
             OnEnable();
         }
-        get => text;
     }
 
     private float duration;

@@ -32,21 +32,32 @@ public class UIPlayerStatus : MonoBehaviourPun
         notActText.gameObject.SetActive(notAct);
     }
 
-    public void SetNumberCard(bool secret, List<int> numberCards)
+    public void SetNumberCard(bool secret, List<int> numberCards, GhostCard ghostCard)
     {
         int sum = 0;
+        int ghostCardAdder = 0;
         for (int i = 0; i < numberCardTexts.Length; i++)
         {
-            if (numberCards.Count > i)
+            if (ghostCard != null && ghostCard.index == i)
+            {
+                sum += ghostCard.number;
+                ghostCardAdder = -1;
+                numberCardTexts[i].gameObject.SetActive(true);
+                numberCardTexts[i].text = ghostCard.number.ToString();
+                numberCardTexts[i].color = Color.yellow;
+                continue;
+            }
+
+            if (numberCards.Count > i + ghostCardAdder)
             {
                 numberCardTexts[i].gameObject.SetActive(true);
                 if (i == 0 && !secret)
                     numberCardTexts[i].text = "?";
                 else
                 {
-                    sum += numberCards[i];
-                    numberCardTexts[i].text = numberCards[i].ToString();
-                    // TODO 색깔
+                    sum += numberCards[i+ ghostCardAdder];
+                    numberCardTexts[i].text = numberCards[i + ghostCardAdder].ToString();
+                    numberCardTexts[i].color = Color.black;
                 }
             }
             else

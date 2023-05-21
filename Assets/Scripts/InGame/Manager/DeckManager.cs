@@ -1,7 +1,6 @@
 ﻿using System.Collections.Generic;
 using Photon.Pun;
 
-
 public enum SpecialType
 {
     THREE_CARD,
@@ -29,12 +28,24 @@ public enum SpecialType
     RESISTANCE,
     GHOST_CARD,
     REFLECT,
-    TIMEWATCH
+    TIME_WATCH
+}
+
+public class GhostCard
+{
+    public int index;
+    public int number;
+
+    public GhostCard(int number, int index)
+    {
+        this.number = number;
+        this.index = index;
+    }
 }
 public class DeckManager : SingletonPun<DeckManager>
 {
     private List<int> numberDecks = new List<int>();
-    private List<SpecialType> specialDecks = new List<SpecialType>();
+    private readonly List<SpecialType> specialDecks = new List<SpecialType>();
 
     public void Init()
     {
@@ -48,9 +59,8 @@ public class DeckManager : SingletonPun<DeckManager>
         for (int i = 1; i <= 11; i++)
             numberDecks.Add(i);
         
-        for (SpecialType specialCard = 0; specialCard <= SpecialType.TIMEWATCH; specialCard++)
+        for (SpecialType specialCard = 0; specialCard <= SpecialType.TIME_WATCH; specialCard++)
         {
-            if (specialCard == SpecialType.ALCHEMY || specialCard == SpecialType.SPECIAL_EYE || specialCard >= SpecialType.SEAL) continue;
             specialDecks.Add(specialCard);
         }
     }

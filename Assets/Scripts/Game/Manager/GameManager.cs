@@ -3,18 +3,43 @@ using UnityEngine.SceneManagement;
 
 public enum SceneType
 {
-    TITLE,
+    NAMING,
+    MATCHING,
     INGAME
 }
 public class GameManager : Singleton<GameManager>
 {
     protected override bool IsDontDestroying => true;
+    public string nickName;
 
     protected override void OnCreated()
     {
-        OnReset();
         Application.targetFrameRate = 60;
         Application.runInBackground = true;
+        
+        LoadNickName();
+        OnReset();
+    }
+    
+    private void LoadNickName()
+    {
+        nickName = PlayerPrefs.GetString("NickName", string.Empty);
+    }
+
+    private void SaveNickName()
+    {
+        PlayerPrefs.SetString("NickName", nickName);
+    }
+
+    private void OnApplicationPause(bool pauseStatus)
+    {
+        if (pauseStatus)
+            SaveNickName();
+    }
+
+    private void OnApplicationQuit()
+    {
+        SaveNickName();
     }
 
     protected override void OnReset()

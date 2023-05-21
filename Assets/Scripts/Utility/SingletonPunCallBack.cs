@@ -1,3 +1,4 @@
+using System;
 using Photon.Pun;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -6,17 +7,26 @@ public class SingletonPunCallBack<T> : MonoBehaviourPunCallbacks where T : MonoB
 {
     private static T instance;
     protected virtual bool IsDontDestroying => false;
+
     public static T Instance
     {
         get
         {
-            if (instance != null) return instance;
+            try
+            {
+                if (instance != null) return instance;
 
-            instance = FindObjectOfType(typeof(T)) as T;
-            if (instance != null) return instance;
+                instance = FindObjectOfType(typeof(T)) as T;
+                if (instance != null) return instance;
 
-            var temp = new GameObject(typeof(T).Name);
-            instance = temp.AddComponent<T>();
+                var temp = new GameObject(typeof(T).Name);
+                instance = temp.AddComponent<T>();
+            }
+            catch (Exception ex)
+            {
+                // ignored
+            }
+
             return instance;
         }
     }
@@ -45,7 +55,7 @@ public class SingletonPunCallBack<T> : MonoBehaviourPunCallbacks where T : MonoB
     {
         OnReset();
     }
-    
+
     protected virtual void OnReset()
     {
     }

@@ -3,8 +3,8 @@ using UnityEngine;
 
 public class SpecialData
 {
-    public string name;
-    public string description;
+    public readonly string name;
+    public readonly string description;
 
     public SpecialData(string name, string description)
     {

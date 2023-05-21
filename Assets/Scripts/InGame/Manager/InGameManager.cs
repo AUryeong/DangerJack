@@ -1,13 +1,27 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using Photon.Pun;
 using System.Linq;
+using Random = UnityEngine.Random;
 
 public enum Team
 {
     NONE,
     RED,
     BLUE
+}
+
+public class CardTable
+{
+    public readonly Team owner;
+    public readonly SpecialType type;
+
+    public CardTable(Team owner, SpecialType type)
+    {
+        this.owner = owner;
+        this.type = type;
+    }
 }
 
 public class InGameManager : SingletonPunCallBack<InGameManager>
@@ -22,7 +36,26 @@ public class InGameManager : SingletonPunCallBack<InGameManager>
     private bool isEnemyTurnNoDraw;
     public bool isGameStart;
     public Team turnOwner = Team.RED;
-    public int targetValue { get; private set; } = 21;
+
+    private readonly List<CardTable> cardTables = new List<CardTable>();
+
+    private int alchemyCount;
+
+    public int TargetValue
+    {
+        get
+        {
+            foreach (var cardTable in cardTables)
+            {
+                if (cardTable.type == SpecialType.TARGET_24)
+                    return 24;
+                if (cardTable.type == SpecialType.TARGET_27)
+                    return 27;
+            }
+
+            return 21;
+        }
+    }
 
     public bool IsTurnMine => turnOwner == player.team;
 
@@ -30,12 +63,34 @@ public class InGameManager : SingletonPunCallBack<InGameManager>
     {
         if (!IsGaming) return;
 
-        ExitGame();
+        ExitGameMatching();
     }
 
-    public void ExitGame()
+    public List<CardTable> GetCardTables()
     {
-        GameManager.Instance.LoadScene(SceneType.TITLE);
+        return new List<CardTable>(cardTables);
+    }
+
+    private void ExitGameMatching()
+    {
+        GameManager.Instance.LoadScene(SceneType.MATCHING);
+    }
+
+    private void ExitGameNaming()
+    {
+        GameManager.Instance.LoadScene(SceneType.NAMING);
+    }
+
+    [PunRPC]
+    private void GameEndRPC()
+    {
+        IsGaming = false;
+        photonView.RPC(nameof(DisconnectGameRPC), RpcTarget.AllBuffered);
+    }
+
+    [PunRPC]
+    private void DisconnectGameRPC()
+    {
         PhotonNetwork.Disconnect();
     }
 
@@ -55,7 +110,6 @@ public class InGameManager : SingletonPunCallBack<InGameManager>
         if (!master) return;
 
         CheckLoading();
-        if (!IsGaming) return;
     }
 
     [PunRPC]
@@ -111,24 +165,12 @@ public class InGameManager : SingletonPunCallBack<InGameManager>
         turnOwner = Team.RED;
     }
 
-    public void SetTargetValue(int value)
-    {
-        photonView.RPC(nameof(SetTargetValueRPC), RpcTarget.AllBuffered, value);
-    }
-
-    [PunRPC]
-    private void SetTargetValueRPC(int value)
-    {
-        targetValue = value;
-        UIManager.Instance.TargetValueSetting();
-    }
-
-    public void TurnChange()
+    public void TurnChange(bool isSkipCheckDraw = false)
     {
         if (!IsTurnMine) return;
         if (!IsGaming) return;
 
-        bool temp = isTurnNoDraw;
+        bool temp = isTurnNoDraw && !isSkipCheckDraw;
         photonView.RPC(nameof(TurnChangeRPC), RpcTarget.AllBuffered, temp);
     }
 
@@ -139,13 +181,13 @@ public class InGameManager : SingletonPunCallBack<InGameManager>
         if (isEnemyTurnNoDraw && isTurnSkipPrev)
         {
             Player winner = null;
-            int targetNumber = targetValue;
+            int targetNumber = TargetValue;
             UIManager.Instance.LogText("게임 종료!");
 
             if (player.GetSum() > targetNumber && enemyPlayer.GetSum() > targetNumber)
             {
                 if (player.GetSum() == enemyPlayer.GetSum())
-                    winner = player.team == Team.BLUE ? player : enemyPlayer;
+                    winner = GetPlayer(Team.RED);
                 else if (player.GetSum() > enemyPlayer.GetSum())
                     winner = enemyPlayer;
                 else
@@ -165,7 +207,7 @@ public class InGameManager : SingletonPunCallBack<InGameManager>
                 else
                 {
                     if (player.GetSum() == enemyPlayer.GetSum())
-                        winner = player.team == Team.BLUE ? player : enemyPlayer;
+                        winner = GetPlayer(Team.RED);
                     else if (player.GetSum() < enemyPlayer.GetSum())
                         winner = enemyPlayer;
                     else
@@ -173,28 +215,40 @@ public class InGameManager : SingletonPunCallBack<InGameManager>
                 }
             }
 
-            UIManager.Instance.UpdateCard(player.team, player.numberCards, true);
-            UIManager.Instance.UpdateCard(enemyPlayer.team, enemyPlayer.numberCards, true);
+            UIManager.Instance.UpdateCard(player.team, player.numberCards, player.GhostCard, true);
+            UIManager.Instance.UpdateCard(enemyPlayer.team, enemyPlayer.numberCards, enemyPlayer.GhostCard, true);
             UIManager.Instance.LogText(TeamUtil.GetColoringPlayerName(winner) + "의 승리!");
             UIManager.Instance.GameEnd(winner);
+
             IsGaming = false;
+            photonView.RPC(nameof(GameEndRPC), RpcTarget.OthersBuffered);
             return;
         }
 
-        UIManager.Instance.PlayerNotActSetting(team, isTurnNoDraw);
+        UIManager.Instance.PlayerNotActSetting(team, isTurnSkipPrev);
         UIManager.Instance.PlayerNotActSetting(TeamUtil.OtherTeam(team), false);
 
-        UIManager.Instance.LogText($"{TeamUtil.GetColoringPlayerName(GetPlayer(TeamUtil.OtherTeam(team)))}의 턴");
+        turnOwner = TeamUtil.OtherTeam(team);
+        turnCount++;
+        UIManager.Instance.LogText($"{TeamUtil.GetColoringPlayerName(GetPlayer(turnOwner))}의 {turnCount}번째 턴");
+
         if (isTurnSkipPrev)
         {
-            UIManager.Instance.LogText($"{TeamUtil.GetColoringPlayerName(GetPlayer(team))}가 숫자 카드를 뽑지 않았습니다.");
+            UIManager.Instance.LogText($"{TeamUtil.GetColoringPlayerName(GetPlayer(team))}가 <color=#8B0000>숫자 카드를 뽑지 않았습니다.</color>");
+        }
+
+        if (IsCardTableSetting(SpecialType.SEAL, turnOwner))
+        {
+            RemoveCardTableRPC(SpecialType.SEAL);
+        }
+
+        if (IsCardTableSetting(SpecialType.REFLECT, turnOwner))
+        {
+            RemoveCardTableRPC(SpecialType.REFLECT);
         }
 
         isEnemyTurnNoDraw = isTurnSkipPrev;
         isTurnNoDraw = true;
-
-        turnOwner = TeamUtil.OtherTeam(team);
-        turnCount++;
 
         if (master)
             GetPlayer(turnOwner).DrawSpecialCard(2);
@@ -222,6 +276,69 @@ public class InGameManager : SingletonPunCallBack<InGameManager>
         player.DrawNumberCard();
     }
 
+    public void ResetCardTable(Team team = Team.NONE)
+    {
+        photonView.RPC(nameof(ResetCardTableRPC), RpcTarget.AllBuffered, team);
+    }
+
+    [PunRPC]
+    private void ResetCardTableRPC(Team team)
+    {
+        if (team == Team.NONE)
+        {
+            foreach (var cardTable in cardTables)
+                UIManager.Instance.LogText($"<color=#FFEE00>{ResourceManager.Instance.GetSpecialData(cardTable.type).name}</color> 카드가 게임 테이블에서 파괴되었습니다.");
+
+            cardTables.Clear();
+        }
+        else
+        {
+            foreach (var cardTable in cardTables)
+            {
+                if (cardTable.owner == team)
+                    UIManager.Instance.LogText($"<color=#FFEE00>{ResourceManager.Instance.GetSpecialData(cardTable.type).name}</color> 카드가 게임 테이블에서 파괴되었습니다.");
+            }
+
+            cardTables.RemoveAll((cardTable) => cardTable.owner == team);
+        }
+
+        UIManager.Instance.UpdateCardTable();
+    }
+
+    public void RemoveCardTable(SpecialType type)
+    {
+        photonView.RPC(nameof(RemoveCardTableRPC), RpcTarget.AllBuffered, type);
+    }
+
+    [PunRPC]
+    private void RemoveCardTableRPC(SpecialType type)
+    {
+        var cardTable = cardTables.Find((table) => table.type == type);
+        if (cardTable != null)
+            cardTables.Remove(cardTable);
+
+        UIManager.Instance.LogText($"<color=#FFEE00>{ResourceManager.Instance.GetSpecialData(type).name}</color> 카드가 게임 테이블에서 파괴되었습니다.");
+        UIManager.Instance.UpdateCardTable();
+    }
+
+    public void AddCardTable(Team owner, SpecialType type)
+    {
+        photonView.RPC(nameof(AddCardTableRPC), RpcTarget.AllBuffered, owner, type);
+    }
+
+    [PunRPC]
+    private void AddCardTableRPC(Team owner, SpecialType type)
+    {
+        cardTables.Add(new CardTable(owner, type));
+        UIManager.Instance.LogText($"<color=#FFEE00>{ResourceManager.Instance.GetSpecialData(type).name}</color> 카드가 게임 테이블에 추가되었습니다.");
+        UIManager.Instance.UpdateCardTable();
+    }
+
+    private bool IsCardTableSetting(SpecialType type, Team tableOwner = Team.NONE)
+    {
+        return cardTables.Exists((cardTable) => cardTable.type == type && (tableOwner == Team.NONE || cardTable.owner == tableOwner));
+    }
+
     [PunRPC]
     private void DrawNumberRPC()
     {
@@ -235,26 +352,94 @@ public class InGameManager : SingletonPunCallBack<InGameManager>
 
     public void UseSpecialCard(SpecialType specialType)
     {
+        var owner = player;
+        var target = enemyPlayer;
+        if (alchemyCount > 0)
+        {
+            alchemyCount--;
+            player.ReturnSpecialCard(specialType);
+            UIManager.Instance.OpenSpecialCardWindow();
+            UIManager.Instance.LogText($"<color=#FFEE00>{ResourceManager.Instance.GetSpecialData(specialType).name}</color>를 덱으로 돌려보냈습니다.");
+            if (alchemyCount <= 0)
+            {
+                player.DrawSpecialCard(3);
+            }
+            return;
+        }
+
+        if (IsCardTableSetting(SpecialType.SEAL, enemyPlayer.team))
+        {
+            switch (specialType)
+            {
+                case SpecialType.RUIN:
+                case SpecialType.DESTROY:
+                    break;
+                default:
+                    UIManager.Instance.LogText($"<color=#FFEE00>{ResourceManager.Instance.GetSpecialData(SpecialType.SEAL).name}</color>의 효과에 의해 사용 불가능합니다!");
+                    return;
+            }
+        }
+
+        if (IsCardTableSetting(SpecialType.RESISTANCE, enemyPlayer.team))
+        {
+            switch (specialType)
+            {
+                case SpecialType.ATTACK:
+                case SpecialType.CHANGE:
+                case SpecialType.MERCY:
+                case SpecialType.RECALL:
+                case SpecialType.DEPRIVATION:
+                    UIManager.Instance.LogText($"<color=#FFEE00>{ResourceManager.Instance.GetSpecialData(SpecialType.RESISTANCE).name}</color>의 효과에 의해 사용 불가능합니다!");
+                    return;
+            }
+        }
+
+        if (specialType == SpecialType.ALCHEMY)
+        {
+            if (owner.specialCards.Count <= 3)
+            {
+                UIManager.Instance.LogText($"<color=#FFEE00>{ResourceManager.Instance.GetSpecialData(specialType).name}</color>을 사용할려면 2장의 스페셜 카드가 필요합니다!");
+                return;
+            }
+        }
+
         player.RemoveSpecialCard(specialType);
+
         var specialData = ResourceManager.Instance.GetSpecialData(specialType);
         string coloringName = TeamUtil.GetColoringPlayerName(player);
-        UIManager.Instance.LogText($"{coloringName}가 스페셜 카드 {specialData.name}를 사용했습니다", LogType.EVERYONE);
+        UIManager.Instance.LogText($"{coloringName}가 스페셜 카드 <color=#FFEE00>{specialData.name}</color>를 사용했습니다", LogType.EVERYONE);
+
+        if (IsCardTableSetting(SpecialType.REFLECT, enemyPlayer.team))
+        {
+            switch (specialType)
+            {
+                case SpecialType.ATTACK:
+                case SpecialType.DEPRIVATION:
+                case SpecialType.MERCY:
+                case SpecialType.SEAL:
+                    target = player;
+                    owner = enemyPlayer;
+                    UIManager.Instance.LogText("<color=#FFEE00>반사의 효과</color>에 의해 대상이 반전됬습니다.", LogType.EVERYONE);
+                    break;
+            }
+        }
+
         switch (specialType)
         {
             case SpecialType.THREE_CARD:
-                player.DrawNumberCardSpecial(3);
+                owner.DrawNumberCardSpecial(3);
                 break;
             case SpecialType.FOUR_CARD:
-                player.DrawNumberCardSpecial(4);
+                owner.DrawNumberCardSpecial(4);
                 break;
             case SpecialType.FIVE_CARD:
-                player.DrawNumberCardSpecial(5);
+                owner.DrawNumberCardSpecial(5);
                 break;
             case SpecialType.SIX_CARD:
-                player.DrawNumberCardSpecial(6);
+                owner.DrawNumberCardSpecial(6);
                 break;
             case SpecialType.DECK_DRAW:
-                player.DrawNumberCard();
+                owner.DrawNumberCard();
                 break;
             case SpecialType.MIN_CARD:
                 if (DeckManager.Instance.IsNumberDeckEmpty())
@@ -262,8 +447,9 @@ public class InGameManager : SingletonPunCallBack<InGameManager>
                     UIManager.Instance.LogText("숫자 카드 덱이 비어있습니다.");
                     break;
                 }
+
                 var minCard = DeckManager.Instance.GetNumberDecks().Min();
-                player.DrawNumberCardSpecial(minCard);
+                owner.DrawNumberCardSpecial(minCard);
                 break;
             case SpecialType.MAX_CARD:
                 if (DeckManager.Instance.IsNumberDeckEmpty())
@@ -271,65 +457,132 @@ public class InGameManager : SingletonPunCallBack<InGameManager>
                     UIManager.Instance.LogText("숫자 카드 덱이 비어있습니다.");
                     break;
                 }
+
                 var maxCard = DeckManager.Instance.GetNumberDecks().Max();
-                player.DrawNumberCardSpecial(maxCard);
+                owner.DrawNumberCardSpecial(maxCard);
                 break;
             case SpecialType.RETURN:
-                if (player.numberCards.Count <= 1)
+                if (owner.numberCards.Count <= 1)
                 {
                     UIManager.Instance.LogText("시크릿 카드는 되돌릴 수 없습니다.");
                     break;
                 }
-                var lastCard = player.numberCards[player.numberCards.Count - 1];
-                player.ReturnNumberCard(lastCard);
+
+                if (owner.GhostCard != null)
+                {
+                    if (owner.GhostCard.index == owner.numberCards.Count)
+                    {
+                        UIManager.Instance.LogText(TeamUtil.GetColoringPlayerName(owner) + "의 숫자 <color=#8B0000>" + owner.GhostCard.number + "</color> 고스트 카드가 사라졌습니다", LogType.EVERYONE);
+                        owner.ResetGhostCard();
+                        return;
+                    }
+                }
+
+                var lastCard = owner.numberCards[owner.numberCards.Count - 1];
+                owner.ReturnNumberCard(lastCard);
                 break;
             case SpecialType.DEPRIVATION:
-                if (enemyPlayer.numberCards.Count <= 1)
+                if (target.numberCards.Count <= 1)
                 {
                     UIManager.Instance.LogText("시크릿 카드는 되돌릴 수 없습니다.");
                     break;
                 }
-                var enemyLastCard = enemyPlayer.numberCards[enemyPlayer.numberCards.Count - 1];
-                enemyPlayer.ReturnNumberCard(enemyLastCard);
+
+                if (target.GhostCard != null)
+                {
+                    if (target.GhostCard.index == target.numberCards.Count)
+                    {
+                        target.ResetGhostCard();
+                        return;
+                    }
+                }
+
+                var enemyLastCard = target.numberCards[target.numberCards.Count - 1];
+                target.ReturnNumberCard(enemyLastCard);
                 break;
             case SpecialType.ATTACK:
-                enemyPlayer.DrawNumberCard();
+                target.DrawNumberCard();
                 break;
             case SpecialType.RECALL:
-                if (player.numberCards.Count > 1)
+                if (owner.numberCards.Count > 1)
                 {
-                    var recallLastCard = player.numberCards[player.numberCards.Count - 1];
-                    player.ReturnNumberCard(recallLastCard);
+                    if (owner.GhostCard != null)
+                    {
+                        if (owner.GhostCard.index == owner.numberCards.Count)
+                        {
+                            UIManager.Instance.LogText(TeamUtil.GetColoringPlayerName(owner) + "의 숫자 <color=#228B22>" + owner.GhostCard.number + "</color> 고스트 카드가 사라졌습니다", LogType.EVERYONE);
+                            owner.ResetGhostCard();
+                            return;
+                        }
+                    }
+
+                    var recallLastCard = owner.numberCards[owner.numberCards.Count - 1];
+                    owner.ReturnNumberCard(recallLastCard);
                 }
                 else
                     UIManager.Instance.LogText("시크릿 카드는 되돌릴 수 없습니다.");
 
-                if (enemyPlayer.numberCards.Count > 1)
+                if (target.numberCards.Count > 1)
                 {
-                    var recallLastCard = enemyPlayer.numberCards[enemyPlayer.numberCards.Count - 1];
-                    enemyPlayer.ReturnNumberCard(recallLastCard);
+                    if (target.GhostCard != null)
+                    {
+                        if (target.GhostCard.index == target.numberCards.Count)
+                        {
+                            UIManager.Instance.LogText(TeamUtil.GetColoringPlayerName(target) + "의 숫자 <color=#228B22>" + target.GhostCard.number + "</color> 고스트 카드가 사라졌습니다", LogType.EVERYONE);
+                            target.ResetGhostCard();
+                            return;
+                        }
+                    }
+
+                    var recallLastCard = target.numberCards[target.numberCards.Count - 1];
+                    target.ReturnNumberCard(recallLastCard);
                 }
                 else
                     UIManager.Instance.LogText("시크릿 카드는 되돌릴 수 없습니다.");
+
                 break;
             case SpecialType.CHANGE:
-                if (player.numberCards.Count <= 1 || enemyPlayer.numberCards.Count <= 1)
+                if (owner.numberCards.Count <= 1 || target.numberCards.Count <= 1)
                 {
                     UIManager.Instance.LogText("시크릿 카드는 교환할 수 없습니다.");
                     break;
                 }
-                var playerCard = player.numberCards[player.numberCards.Count - 1];
-                var enemyCard = enemyPlayer.numberCards[enemyPlayer.numberCards.Count - 1];
 
-                player.RemoveNumberCard(playerCard);
-                enemyPlayer.RemoveNumberCard(enemyCard);
+                var playerCard = owner.numberCards[owner.numberCards.Count - 1];
+                var enemyCard = target.numberCards[target.numberCards.Count - 1];
+                if (owner.GhostCard != null)
+                {
+                    if (owner.GhostCard.index == owner.numberCards.Count)
+                    {
+                        target.RemoveNumberCard(enemyCard);
+                        owner.AddNumberCard(enemyCard);
+                        target.AddGhostCard(owner.GhostCard.number, target.numberCards.Count);
+                        owner.ResetGhostCard();
+                        return;
+                    }
+                }
 
-                enemyPlayer.AddNumberCard(playerCard);
-                player.AddNumberCard(enemyCard);
+                if (target.GhostCard != null)
+                {
+                    if (target.GhostCard.index == target.numberCards.Count)
+                    {
+                        owner.RemoveNumberCard(playerCard);
+                        target.AddNumberCard(playerCard);
+                        owner.AddGhostCard(target.GhostCard.number, owner.numberCards.Count);
+                        target.ResetGhostCard();
+                        return;
+                    }
+                }
+
+                owner.RemoveNumberCard(playerCard);
+                target.RemoveNumberCard(enemyCard);
+
+                target.AddNumberCard(playerCard);
+                owner.AddNumberCard(enemyCard);
                 break;
             case SpecialType.LOW_HIGH_CHECK:
-                int playerSum = player.GetSum();
-                int enemySum = enemyPlayer.GetSum();
+                int playerSum = owner.GetSum();
+                int enemySum = target.GetSum();
 
                 if (playerSum > enemySum)
                     UIManager.Instance.LogText("당신의 합이 더 큽니다.");
@@ -340,10 +593,22 @@ public class InGameManager : SingletonPunCallBack<InGameManager>
 
                 break;
             case SpecialType.SPECIAL_EYE:
-                // TODO 전용 UI 생성
+                UIManager.Instance.OpenSelectCardWindow(specialType,
+                    new string[]
+                    {
+                        "제일 큰 수를 알아낸다",
+                        "제일 작은 수를 알아낸다"
+                    },
+                    new Action[]
+                    {
+                        () => UIManager.Instance.LogText("제일 큰 수 : " + target.numberCards.Max()),
+                        () => UIManager.Instance.LogText("제일 작은 수 : " +
+                                                         (target.GhostCard != null && target.GhostCard.number < target.numberCards.Min() ? target.GhostCard.number : enemyPlayer.numberCards.Min()))
+                    });
                 break;
             case SpecialType.ALCHEMY:
-                // TODO 전용 UI 생성
+                alchemyCount = 2;
+                UIManager.Instance.OpenSpecialCardWindow();
                 break;
             case SpecialType.PERFECT_SELECT:
                 if (DeckManager.Instance.IsNumberDeckEmpty())
@@ -351,30 +616,8 @@ public class InGameManager : SingletonPunCallBack<InGameManager>
                     UIManager.Instance.LogText("숫자 카드 덱이 비어있습니다.");
                     break;
                 }
-                int sum = player.GetSum();
-                if (sum >= targetValue)
-                {
-                    player.DrawNumberCardSpecial(DeckManager.Instance.GetNumberDecks().Min());
-                }
-                else if (sum + 11 <= targetValue)
-                {
-                    player.DrawNumberCardSpecial(DeckManager.Instance.GetNumberDecks().Max());
-                }
-                else
-                {
-                    var numberDecks = DeckManager.Instance.GetNumberDecks();
-                    numberDecks = numberDecks.OrderByDescending((x) => x).ToList();
 
-                    int goodCard = -1;
-                    foreach (int i in numberDecks)
-                    {
-                        goodCard = i;
-                        if (sum + goodCard <= 21)
-                            break;
-                    }
-                    
-                    player.DrawNumberCardSpecial(goodCard);
-                }
+                owner.PerfectSelect();
                 break;
             case SpecialType.MERCY:
                 if (DeckManager.Instance.IsNumberDeckEmpty())
@@ -382,50 +625,54 @@ public class InGameManager : SingletonPunCallBack<InGameManager>
                     UIManager.Instance.LogText("숫자 카드 덱이 비어있습니다.");
                     break;
                 }
-                int mercySum = enemyPlayer.GetSum();
-                if (mercySum >= targetValue)
-                {
-                    enemyPlayer.DrawNumberCardSpecial(DeckManager.Instance.GetNumberDecks().Min());
-                }
-                else if (mercySum + 11 <= targetValue)
-                {
-                    enemyPlayer.DrawNumberCardSpecial(DeckManager.Instance.GetNumberDecks().Max());
-                }
-                else
-                {
-                    var numberDecks = DeckManager.Instance.GetNumberDecks();
-                    numberDecks = numberDecks.OrderByDescending((x) => x).ToList();
 
-                    int goodCard = -1;
-                    foreach (int i in numberDecks)
-                    {
-                        goodCard = i;
-                        if (mercySum + goodCard <= 21)
-                            break;
-                    }
-
-                    enemyPlayer.DrawNumberCardSpecial(goodCard);
-                }
+                target.PerfectSelect();
                 break;
-            case SpecialType.TARGET_24: 
-                SetTargetValue(24);
+            case SpecialType.TARGET_24:
+                if (IsCardTableSetting(SpecialType.TARGET_27))
+                    RemoveCardTable(SpecialType.TARGET_27);
+
+                AddCardTable(owner.team, SpecialType.TARGET_24);
                 break;
             case SpecialType.TARGET_27:
-                SetTargetValue(27);
+                if (IsCardTableSetting(SpecialType.TARGET_24))
+                    RemoveCardTable(SpecialType.TARGET_24);
+
+                AddCardTable(owner.team, SpecialType.TARGET_27);
                 break;
             case SpecialType.SEAL:
+                AddCardTable(owner.team, SpecialType.SEAL);
                 break;
             case SpecialType.DESTROY:
+                ResetCardTable(TeamUtil.OtherTeam(owner.team));
                 break;
             case SpecialType.RUIN:
+                ResetCardTable();
                 break;
             case SpecialType.RESISTANCE:
+                AddCardTable(owner.team, SpecialType.RESISTANCE);
                 break;
             case SpecialType.GHOST_CARD:
+                int index = owner.numberCards.Count;
+                UIManager.Instance.OpenSelectCardWindow(specialType,
+                    new string[]
+                    {
+                        "-1으로 제작한다",
+                        "0으로 제작한다",
+                        "1로 제작한다"
+                    },
+                    new Action[]
+                    {
+                        () => owner.AddGhostCard(-1, index),
+                        () => owner.AddGhostCard(0, index),
+                        () => owner.AddGhostCard(1, index)
+                    });
                 break;
             case SpecialType.REFLECT:
+                AddCardTable(owner.team, SpecialType.REFLECT);
                 break;
-            case SpecialType.TIMEWATCH:
+            case SpecialType.TIME_WATCH:
+                TurnChange(true);
                 break;
         }
     }
