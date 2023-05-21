@@ -70,6 +70,17 @@ public class InGameManager : SingletonPunCallBack<InGameManager>
     {
         return new List<CardTable>(cardTables);
     }
+    
+    private void OnApplicationQuit()
+    {
+        DisconnectGameRPC();
+    }
+
+    private void OnApplicationPause(bool pauseStatus)
+    {
+        if (pauseStatus)
+            DisconnectGameRPC();
+    }
 
     private void ExitGameMatching()
     {
